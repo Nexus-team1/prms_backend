@@ -59,3 +59,34 @@ export const deleteTask = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to delete task", error: err });
   }
 };
+
+export const assignTaskToUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ message: "userId is required" });
+  }
+  try {
+    const task = await prisma.task.update({
+      where: { id: Number(id) },
+      data: { userId: Number(userId) },
+    });
+    res.json(task);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to assign task", error: err });
+  }
+};
+
+export const getTasksByUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const tasks = await prisma.task.findMany({
+      where: { userId: Number(id) },
+    });
+    res.json(tasks);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch user's tasks", error: err });
+  }
+};

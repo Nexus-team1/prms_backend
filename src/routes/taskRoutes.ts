@@ -6,6 +6,8 @@ import {
   getTaskById,
   updateTask,
   deleteTask,
+  assignTaskToUser,
+  getTasksByUser,
 } from "../controllers/taskController";
 
 const router = Router();
@@ -24,6 +26,12 @@ router.put("/:id", (req: Request, res: Response) => {
 });
 router.delete("/:id", (req: Request, res: Response) => {
   deleteTask(req, res);
+});
+router.post("/:id/assign", (req: Request, res: Response) => {
+  assignTaskToUser(req, res);
+});
+router.get("/user/:id", (req: Request, res: Response) => {
+  getTasksByUser(req, res);
 });
 
 export default router;
