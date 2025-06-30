@@ -3,12 +3,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import authRoutes from "./routes/authRoutes";
+import taskRoutes from "./routes/taskRoutes";
 
 const app = express();
 app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 app.use("/api/auth", authRoutes);
+app.use("/api/tasks", taskRoutes);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Hello, Express + TypeScript!");
