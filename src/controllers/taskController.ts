@@ -62,18 +62,60 @@ export const deleteTask = async (req: Request, res: Response) => {
 
 export const assignTaskToUser = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { userId } = req.body;
-  if (!userId) {
-    return res.status(400).json({ message: "userId is required" });
-  }
   try {
-    const task = await prisma.task.update({
-      where: { id: Number(id) },
-      data: { userId: Number(userId) },
+    // Get the task and its preferredRole
+    const task = await prisma.task.findUnique({ where: { id: Number(id) } });
+    if (!task || !task.preferredRole) {
+      return res
+        .status(400)
+        .json({ message: "Task or preferredRole not found" });
+    }
+
+    // Get all users with the preferred role and isActive
+    const users = await prisma.user.findMany({
+      where: {
+        role: task.preferredRole,
+        isActive: true,
+      },
+      orderBy: { id: "asc" },
     });
-    res.json(task);
+    if (!users.length) {
+      return res
+        .status(404)
+        .json({ message: `No users with role ${task.preferredRole}` });
+    }
+
+    // Find the last assigned user for this role (by userId)
+    const lastTask = await prisma.task.findFirst({
+      where: {
+        preferredRole: task.preferredRole,
+        userId: { in: users.map((u) => u.id) },
+        id: { lt: task.id },
+      },
+      orderBy: { id: "desc" },
+    });
+
+    let nextUser: (typeof users)[0];
+    if (!lastTask) {
+      // Assign to the first user if no previous assignment
+      nextUser = users[0];
+    } else {
+      // Find the next user in rotation
+      const lastIndex = users.findIndex((u) => u.id === lastTask.userId);
+      nextUser = users[(lastIndex + 1) % users.length];
+    }
+
+    // Assign the task to the selected user
+    const updatedTask = await prisma.task.update({
+      where: { id: Number(id) },
+      data: { userId: nextUser.id },
+    });
+
+    res.json(updatedTask);
   } catch (err) {
-    res.status(500).json({ message: "Failed to assign task", error: err });
+    res
+      .status(500)
+      .json({ message: "Failed to assign task by rotation", error: err });
   }
 };
 

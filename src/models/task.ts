@@ -1,4 +1,4 @@
-export interface Task {
+export interface Task3 {
   id: number;
   title: string;
   description?: string;
@@ -7,4 +7,5 @@ export interface Task {
   createdAt: Date;
   updatedAt: Date;
   userId: number;
+  preferredRole?: string; // "DEVELOPER" or "DESIGNER"
 }
