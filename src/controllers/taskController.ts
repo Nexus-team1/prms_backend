@@ -2,13 +2,32 @@ import { Request, Response } from "express";
 import prisma from "../models/prisma";
 
 export const createTask = async (req: Request, res: Response) => {
-  const { title, description, dueDate, userId } = req.body;
-  if (!title || !userId) {
-    return res.status(400).json({ message: "Title and userId are required" });
+  const {
+    title,
+    description,
+    dueDate,
+    assignedToId,
+    projectId,
+    sprintId,
+    preferredRole,
+  } = req.body;
+  if (!title || !projectId) {
+    return res
+      .status(400)
+      .json({ message: "Title and projectId are required" });
   }
   try {
     const task = await prisma.task.create({
-      data: { title, description, dueDate, userId },
+      data: {
+        title,
+        description,
+        dueDate,
+        projectId,
+        sprintId,
+        assignedToId,
+        preferredRole,
+      },
+      include: { project: true, sprint: true, assignedTo: true },
     });
     res.status(201).json(task);
   } catch (err) {
@@ -18,7 +37,9 @@ export const createTask = async (req: Request, res: Response) => {
 
 export const getTasks = async (req: Request, res: Response) => {
   try {
-    const tasks = await prisma.task.findMany();
+    const tasks = await prisma.task.findMany({
+      include: { project: true, sprint: true, assignedTo: true },
+    });
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch tasks", error: err });
@@ -28,7 +49,10 @@ export const getTasks = async (req: Request, res: Response) => {
 export const getTaskById = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
-    const task = await prisma.task.findUnique({ where: { id: Number(id) } });
+    const task = await prisma.task.findUnique({
+      where: { id: Number(id) },
+      include: { project: true, sprint: true, assignedTo: true },
+    });
     if (!task) return res.status(404).json({ message: "Task not found" });
     res.json(task);
   } catch (err) {
@@ -43,6 +67,7 @@ export const updateTask = async (req: Request, res: Response) => {
     const task = await prisma.task.update({
       where: { id: Number(id) },
       data: { title, description, status, dueDate },
+      include: { project: true, sprint: true, assignedTo: true },
     });
     res.json(task);
   } catch (err) {
@@ -63,7 +88,6 @@ export const deleteTask = async (req: Request, res: Response) => {
 export const assignTaskToUser = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
-    // Get the task and its preferredRole
     const task = await prisma.task.findUnique({ where: { id: Number(id) } });
     if (!task || !task.preferredRole) {
       return res
@@ -71,10 +95,18 @@ export const assignTaskToUser = async (req: Request, res: Response) => {
         .json({ message: "Task or preferredRole not found" });
     }
 
-    // Get all users with the preferred role and isActive
+    // Ensure preferredRole is a valid Role enum value
+    const validRoles = ["DEVELOPER", "DESIGNER"];
+    if (!validRoles.includes(task.preferredRole)) {
+      return res
+        .status(400)
+        .json({ message: "preferredRole must be DEVELOPER or DESIGNER" });
+    }
+
+    // Query users with the correct enum value
     const users = await prisma.user.findMany({
       where: {
-        role: task.preferredRole,
+        role: task.preferredRole as any, // Prisma expects enum, but TS sees string
         isActive: true,
       },
       orderBy: { id: "asc" },
@@ -85,11 +117,11 @@ export const assignTaskToUser = async (req: Request, res: Response) => {
         .json({ message: `No users with role ${task.preferredRole}` });
     }
 
-    // Find the last assigned user for this role (by userId)
+    // Find the last assigned user for this role (by assignedToId)
     const lastTask = await prisma.task.findFirst({
       where: {
         preferredRole: task.preferredRole,
-        userId: { in: users.map((u) => u.id) },
+        assignedToId: { in: users.map((u) => u.id) },
         id: { lt: task.id },
       },
       orderBy: { id: "desc" },
@@ -101,14 +133,15 @@ export const assignTaskToUser = async (req: Request, res: Response) => {
       nextUser = users[0];
     } else {
       // Find the next user in rotation
-      const lastIndex = users.findIndex((u) => u.id === lastTask.userId);
+      const lastIndex = users.findIndex((u) => u.id === lastTask.assignedToId);
       nextUser = users[(lastIndex + 1) % users.length];
     }
 
     // Assign the task to the selected user
     const updatedTask = await prisma.task.update({
       where: { id: Number(id) },
-      data: { userId: nextUser.id },
+      data: { assignedToId: nextUser.id },
+      include: { project: true, sprint: true, assignedTo: true },
     });
 
     res.json(updatedTask);
@@ -123,7 +156,9 @@ export const getTasksByUser = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const tasks = await prisma.task.findMany({
-      where: { userId: Number(id) },
+      where: { assignedToId: Number(id) },
+      include: { project: true, sprint: true, assignedTo: true },
+      orderBy: { createdAt: "desc" },
     });
     res.json(tasks);
   } catch (err) {
