@@ -57,7 +57,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
     const token = jwt.sign({ id: user.id, username: user.username }, SECRET, {
-      expiresIn: "1h",
+      expiresIn: "15d",
     });
     // Exclude password from response
     const { password: _, ...userWithoutPassword } = user;
