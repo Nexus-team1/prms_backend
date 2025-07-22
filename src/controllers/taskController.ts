@@ -121,7 +121,7 @@ export const assignTaskToUser = async (req: Request, res: Response) => {
     const lastTask = await prisma.task.findFirst({
       where: {
         preferredRole: task.preferredRole,
-        assignedToId: { in: users.map((u) => u.id) },
+        assignedToId: { in: users.map((u: { id: any }) => u.id) },
         id: { lt: task.id },
       },
       orderBy: { id: "desc" },
@@ -133,7 +133,9 @@ export const assignTaskToUser = async (req: Request, res: Response) => {
       nextUser = users[0];
     } else {
       // Find the next user in rotation
-      const lastIndex = users.findIndex((u) => u.id === lastTask.assignedToId);
+      const lastIndex: number = users.findIndex(
+        (u: { id: any }) => u.id === lastTask.assignedToId
+      );
       nextUser = users[(lastIndex + 1) % users.length];
     }
 
